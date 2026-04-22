@@ -1,3 +1,13 @@
 spring:
   application:
     name: demo
+
+sonar:
+  host:
+    url: http://localhost:9000
+  token: ${SONAR_TOKEN:sqa_f6b3dbba3594962684af5eccd7edc7f1032b5688}
+
+groq:
+  api-key: ${GROQ_API_KEY:YOUR_GROQ_API_KEY}
+  model: llama-3.3-70b-versatile
+
