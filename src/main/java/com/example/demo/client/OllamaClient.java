@@ -12,19 +12,17 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class GroqClient {
+public class OllamaClient {
 
     private final RestTemplate restTemplate = new RestTemplate();
-    
-    @Value("${groq.api-key}")
-    private String apiKey;
 
-    @Value("${groq.model:llama-3.3-70b-versatile}")
+    @Value("${ollama.api.url:http://localhost:11434/v1/chat/completions}")
+    private String apiUrl;
+
+    @Value("${ollama.model:codellama:7b}")
     private String modelName;
 
     public String generate(String prompt) {
-        String url = "https://api.groq.com/openai/v1/chat/completions";
-
         Map<String, Object> message = new HashMap<>();
         message.put("role", "user");
         message.put("content", prompt);
@@ -35,11 +33,10 @@ public class GroqClient {
         body.put("temperature", 0.0);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + apiKey);
         headers.set("Content-Type", "application/json");
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+        ResponseEntity<Map> response = restTemplate.postForEntity(apiUrl, request, Map.class);
 
         List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
         Map<String, Object> responseMessage = (Map<String, Object>) choices.get(0).get("message");

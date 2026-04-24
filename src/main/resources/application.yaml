@@ -11,3 +11,10 @@ groq:
   api-key: ${GROQ_API_KEY:YOUR_GROQ_API_KEY}
   model: llama-3.3-70b-versatile
 
+ollama:
+  api:
+    url: http://localhost:11434/v1/chat/completions
+  model: codellama:7b
+
+github:
+  token: ${GITHUB_TOKEN}

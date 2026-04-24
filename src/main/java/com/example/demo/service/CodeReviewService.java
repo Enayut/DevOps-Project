@@ -1,7 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.client.GitClient;
-import com.example.demo.client.GroqClient;
+import com.example.demo.client.OllamaClient;
 import com.example.demo.client.SonarQubeClient;
 import com.example.demo.model.IssueDetail;
 import com.example.demo.model.ReviewResponse;
@@ -22,7 +22,7 @@ public class CodeReviewService {
 
     private final GitClient gitClient;
     private final SonarQubeClient sonarQubeClient;
-    private final GroqClient groqClient;
+    private final OllamaClient ollamaClient;
     
     @Value("${sonar.host.url}")
     private String sonarUrl;
@@ -30,17 +30,19 @@ public class CodeReviewService {
     @Value("${sonar.token}")
     private String sonarToken;
 
-    public CodeReviewService(GitClient gitClient, SonarQubeClient sonarQubeClient, GroqClient groqClient) {
+    public CodeReviewService(GitClient gitClient, SonarQubeClient sonarQubeClient, OllamaClient ollamaClient) {
         this.gitClient = gitClient;
         this.sonarQubeClient = sonarQubeClient;
-        this.groqClient = groqClient;
+        this.ollamaClient = ollamaClient;
     }
 
     public ReviewResponse processReview(String repoUrl) {
         File repoDir = null;
         try {
             repoDir = gitClient.cloneRepository(repoUrl);
-            String projectKey = "temp";
+            
+            // Extract a unique project key from the repo URL
+            String projectKey = extractProjectKey(repoUrl);
 
             if (new File(repoDir, "pom.xml").exists()) {
                 runJavaAnalysis(repoDir, projectKey);
@@ -76,6 +78,7 @@ public class CodeReviewService {
             "verify",
             "sonar:sonar",
             "-Dsonar.projectKey=" + projectKey,
+            "-Dsonar.projectName=" + projectKey,
             "-Dsonar.host.url=" + sonarUrl,
             "-Dsonar.login=" + sonarToken
         );
@@ -87,6 +90,11 @@ public class CodeReviewService {
         if (exitCode != 0) {
             throw new RuntimeException("SonarQube analysis failed with exit code " + exitCode);
         }
+    }
+
+    private String extractProjectKey(String repoUrl) {
+        String key = repoUrl.replace("https://github.com/", "").replace("/", "-").replace(".git", "");
+        return key.isEmpty() ? "temp-project" : key;
     }
 
     private List<IssueDetail> processIssues(File repoDir, List<Map<String, Object>> sonarIssues) {
@@ -130,15 +138,17 @@ public class CodeReviewService {
         }
 
         try {
-            String aiResponse = groqClient.generate(promptBuilder.toString());
+            String aiResponse = ollamaClient.generate(promptBuilder.toString());
             
-            // Clean markdown json block if present
+            // Extract JSON array from the response using string boundaries
             aiResponse = aiResponse.trim();
-            if (aiResponse.startsWith("```json")) {
-                aiResponse = aiResponse.substring(7);
-            }
-            if (aiResponse.endsWith("```")) {
-                aiResponse = aiResponse.substring(0, aiResponse.length() - 3);
+            int startIndex = aiResponse.indexOf('[');
+            int endIndex = aiResponse.lastIndexOf(']');
+            
+            if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
+                aiResponse = aiResponse.substring(startIndex, endIndex + 1);
+            } else {
+                throw new RuntimeException("Could not locate JSON array in AI response: " + aiResponse);
             }
 
             // Parse response as a list of maps
